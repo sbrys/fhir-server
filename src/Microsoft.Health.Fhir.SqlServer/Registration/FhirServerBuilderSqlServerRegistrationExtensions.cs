@@ -6,14 +6,18 @@
 using System;
 using System.Linq;
 using EnsureThat;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Health.Extensions.DependencyInjection;
+using Microsoft.Health.Fhir.Core.Features.Search.Registry;
 using Microsoft.Health.Fhir.Core.Registration;
 using Microsoft.Health.Fhir.SqlServer.Features.Schema;
 using Microsoft.Health.Fhir.SqlServer.Features.Search;
 using Microsoft.Health.Fhir.SqlServer.Features.Search.Expressions.Visitors;
 using Microsoft.Health.Fhir.SqlServer.Features.Storage;
+using Microsoft.Health.Fhir.SqlServer.Features.Storage.Registry;
 using Microsoft.Health.SqlServer.Api.Registration;
 using Microsoft.Health.SqlServer.Configs;
+using Microsoft.Health.SqlServer.Features.Client;
 using Microsoft.Health.SqlServer.Features.Schema;
 using Microsoft.Health.SqlServer.Features.Schema.Model;
 using Microsoft.Health.SqlServer.Registration;
@@ -22,18 +26,23 @@ namespace Microsoft.Extensions.DependencyInjection
 {
     public static class FhirServerBuilderSqlServerRegistrationExtensions
     {
-        public static IFhirServerBuilder AddSqlServer(this IFhirServerBuilder fhirServerBuilder, Action<SqlServerDataStoreConfiguration> configureAction = null)
+        public static IFhirServerBuilder AddSqlServer(this IFhirServerBuilder fhirServerBuilder, IConfiguration configuration, Action<SqlServerDataStoreConfiguration> configureAction = null)
         {
             EnsureArg.IsNotNull(fhirServerBuilder, nameof(fhirServerBuilder));
             IServiceCollection services = fhirServerBuilder.Services;
 
-            services.AddSqlServerBase<SchemaVersion>(configureAction);
+            services.AddSqlServerBase<SchemaVersion>(configuration, configureAction);
             services.AddSqlServerApi();
 
-            services.Add(provider => new SchemaInformation((int)SchemaVersion.V1, (int)SchemaVersion.V4))
+            services.Add(provider => new SchemaInformation(SchemaVersionConstants.Min, SchemaVersionConstants.Max))
                 .Singleton()
                 .AsSelf()
                 .AsImplementedInterfaces();
+
+            services.Add<SqlServerSearchParameterStatusDataStore>()
+                .Singleton()
+                .AsSelf()
+                .ReplaceService<ISearchParameterStatusDataStore>();
 
             services.Add<SqlServerFhirModel>()
                 .Singleton()
@@ -61,7 +70,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
             AddSqlServerTableRowParameterGenerators(services);
 
-            services.Add<NormalizedSearchParameterQueryGeneratorFactory>()
+            services.Add<SearchParamTableExpressionQueryGeneratorFactory>()
                 .Singleton()
                 .AsSelf();
 
@@ -73,13 +82,20 @@ namespace Microsoft.Extensions.DependencyInjection
                 .Singleton()
                 .AsSelf();
 
-            services.Add<StringOverflowRewriter>()
-                .Singleton()
-                .AsSelf();
-
             services.Add<SortRewriter>()
                 .Singleton()
                 .AsSelf();
+
+            services.Add<SqlServerSortingValidator>()
+                .Singleton()
+                .AsSelf()
+                .AsImplementedInterfaces();
+
+            services.AddFactory<IScoped<SqlConnectionWrapperFactory>>();
+
+            services.Add<SchemaUpgradedHandler>()
+                .Transient()
+                .AsImplementedInterfaces();
 
             return fhirServerBuilder;
         }

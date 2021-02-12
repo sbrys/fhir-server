@@ -2,6 +2,7 @@ name: "Code Scanning - Action"
 
 on:
   push:
+  pull_request:
   schedule:
     - cron: '0 0 * * 0'
 
@@ -18,6 +19,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v2
+    - name: Fetch all history for all tags and branches
+      run: |
+        git fetch --prune --unshallow
 
     # Initializes the CodeQL tools for scanning.
     - name: Initialize CodeQL

@@ -3,11 +3,13 @@
 // Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // -------------------------------------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using EnsureThat;
 using MediatR;
+using Microsoft.Health.Core;
 using Microsoft.Health.Extensions.DependencyInjection;
 using Microsoft.Health.Fhir.Core.Features.Definition;
 using Microsoft.Health.Fhir.Core.Features.Search.Parameters;
@@ -18,23 +20,23 @@ namespace Microsoft.Health.Fhir.Core.Features.Search.Registry
 {
     public class SearchParameterStatusManager : IRequireInitializationOnFirstRequest
     {
-        private readonly ISearchParameterRegistry _searchParameterRegistry;
+        private readonly ISearchParameterStatusDataStore _searchParameterStatusDataStore;
         private readonly ISearchParameterDefinitionManager _searchParameterDefinitionManager;
         private readonly ISearchParameterSupportResolver _searchParameterSupportResolver;
         private readonly IMediator _mediator;
 
         public SearchParameterStatusManager(
-            ISearchParameterRegistry searchParameterRegistry,
+            ISearchParameterStatusDataStore searchParameterStatusDataStore,
             ISearchParameterDefinitionManager searchParameterDefinitionManager,
             ISearchParameterSupportResolver searchParameterSupportResolver,
             IMediator mediator)
         {
-            EnsureArg.IsNotNull(searchParameterRegistry, nameof(searchParameterRegistry));
+            EnsureArg.IsNotNull(searchParameterStatusDataStore, nameof(searchParameterStatusDataStore));
             EnsureArg.IsNotNull(searchParameterDefinitionManager, nameof(searchParameterDefinitionManager));
             EnsureArg.IsNotNull(searchParameterSupportResolver, nameof(searchParameterSupportResolver));
             EnsureArg.IsNotNull(mediator, nameof(mediator));
 
-            _searchParameterRegistry = searchParameterRegistry;
+            _searchParameterStatusDataStore = searchParameterStatusDataStore;
             _searchParameterDefinitionManager = searchParameterDefinitionManager;
             _searchParameterSupportResolver = searchParameterSupportResolver;
             _mediator = mediator;
@@ -44,16 +46,16 @@ namespace Microsoft.Health.Fhir.Core.Features.Search.Registry
         {
             var updated = new List<SearchParameterInfo>();
 
-            var parameters = (await _searchParameterRegistry.GetSearchParameterStatuses())
+            var parameters = (await _searchParameterStatusDataStore.GetSearchParameterStatuses())
                 .ToDictionary(x => x.Uri);
 
             // Set states of known parameters
-            foreach (var p in _searchParameterDefinitionManager.AllSearchParameters)
+            foreach (SearchParameterInfo p in _searchParameterDefinitionManager.AllSearchParameters)
             {
                 if (parameters.TryGetValue(p.Url, out ResourceSearchParameterStatus result))
                 {
                     bool isSearchable = result.Status == SearchParameterStatus.Enabled;
-                    bool isSupported = result.Status != SearchParameterStatus.Disabled;
+                    bool isSupported = result.Status == SearchParameterStatus.Supported || result.Status == SearchParameterStatus.Enabled;
                     bool isPartiallySupported = result.IsPartiallySupported;
 
                     if (result.Status == SearchParameterStatus.Disabled)
@@ -88,10 +90,47 @@ namespace Microsoft.Health.Fhir.Core.Features.Search.Registry
                 }
             }
 
-            var searchParameterHashValue = SearchHelperUtilities.CalculateSearchParameterHash(parameters.Values);
-            await _mediator.Publish(new SearchParametersHashUpdated(searchParameterHashValue));
+            await _mediator.Publish(new SearchParametersUpdated(updated));
+        }
+
+        public async Task UpdateSearchParameterStatusAsync(IReadOnlyCollection<string> searchParameterUris, SearchParameterStatus status)
+        {
+            var searchParameterStatusList = new List<ResourceSearchParameterStatus>();
+            var updated = new List<SearchParameterInfo>();
+
+            foreach (string uri in searchParameterUris)
+            {
+                var searchParamUri = new Uri(uri);
+
+                var paramInfo = _searchParameterDefinitionManager.GetSearchParameter(searchParamUri);
+                updated.Add(paramInfo);
+                paramInfo.IsSearchable = status == SearchParameterStatus.Enabled;
+                paramInfo.IsSupported = status == SearchParameterStatus.Supported || status == SearchParameterStatus.Enabled;
+
+                searchParameterStatusList.Add(new ResourceSearchParameterStatus()
+                {
+                    LastUpdated = Clock.UtcNow,
+                    Status = status,
+                    Uri = searchParamUri,
+                });
+            }
+
+            await _searchParameterStatusDataStore.UpsertStatuses(searchParameterStatusList);
 
             await _mediator.Publish(new SearchParametersUpdated(updated));
+        }
+
+        internal async Task AddSearchParameterStatusAsync(IReadOnlyCollection<string> searchParamUris)
+        {
+            // new search parameters are added as supported, until reindexing occurs, when
+            // they will be fully enabled
+            await UpdateSearchParameterStatusAsync(searchParamUris, SearchParameterStatus.Supported);
+        }
+
+        internal async Task DeleteSearchParameterStatusAsync(string url)
+        {
+            var searchParamUris = new List<string>() { url };
+            await UpdateSearchParameterStatusAsync(searchParamUris, SearchParameterStatus.Deleted);
         }
     }
 }

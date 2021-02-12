@@ -5,8 +5,8 @@
 
 using System;
 using System.Collections.Generic;
+using Hl7.Fhir.ElementModel;
 using Microsoft.Health.Fhir.Core.Models;
-using Microsoft.Health.Fhir.ValueSets;
 
 namespace Microsoft.Health.Fhir.Core.Features.Definition
 {
@@ -25,9 +25,10 @@ namespace Microsoft.Health.Fhir.Core.Features.Definition
         IEnumerable<SearchParameterInfo> AllSearchParameters { get; }
 
         /// <summary>
-        /// Gets a hash value calculated from the current set of search parameters
+        /// Represents a mapping of resource type to a hash of the search parameters
+        /// currently supported for that resource type.
         /// </summary>
-        string SearchParametersHash { get; }
+        IReadOnlyDictionary<string, string> SearchParameterHashMap { get; }
 
         /// <summary>
         /// Gets list of search parameters for the given <paramref name="resourceType"/>.
@@ -61,12 +62,28 @@ namespace Microsoft.Health.Fhir.Core.Features.Definition
         SearchParameterInfo GetSearchParameter(Uri definitionUri);
 
         /// <summary>
-        /// Gets the type of a search parameter expression. In the case of a composite search parameter, the component parameter
-        /// can be specified, to retrieve the type of that component.
+        /// Updates the existing resource type - search parameter hash mapping with the given new values.
         /// </summary>
-        /// <param name="searchParameter">The search parameter</param>
-        /// <param name="componentIndex">The optional component index if the search parameter is a composite</param>
-        /// <returns>The search parameter type.</returns>
-        SearchParamType GetSearchParameterType(SearchParameterInfo searchParameter, int? componentIndex);
+        /// <param name="updatedSearchParamHashMap">Dictionary containing resource type to search parameter hash values</param>
+        public void UpdateSearchParameterHashMap(Dictionary<string, string> updatedSearchParamHashMap);
+
+        /// <summary>
+        /// Gets the hash of the current search parameters that are supported for the given resource type.
+        /// </summary>
+        /// <param name="resourceType">Resource type for which we need the hash of search parameters.</param>
+        /// <returns>A string representing a hash of the search parameters.</returns>
+        public string GetSearchParameterHashForResourceType(string resourceType);
+
+        /// <summary>
+        /// Allows addition of a new search parameters at runtime.
+        /// </summary>
+        /// <param name="searchParameters">An collection containing SearchParameter resources.</param>
+        void AddNewSearchParameters(IReadOnlyCollection<ITypedElement> searchParameters);
+
+        /// <summary>
+        /// Allows removal of a custom search parameter.
+        /// </summary>
+        /// <param name="searchParam">The custom search parameter to remove.</param>
+        void DeleteSearchParameter(ITypedElement searchParam);
     }
 }

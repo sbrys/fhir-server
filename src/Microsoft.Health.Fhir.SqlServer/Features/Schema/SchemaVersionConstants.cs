@@ -7,7 +7,9 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Schema
 {
     public static class SchemaVersionConstants
     {
-        public const int Max = (int)SchemaVersion.V4;
-        public const int Min = (int)SchemaVersion.V1;
+        public const int Min = (int)SchemaVersion.V4;
+        public const int Max = (int)SchemaVersion.V7;
+        public const int SearchParameterStatusSchemaVersion = (int)SchemaVersion.V6;
+        public const int SupportForReferencesWithMissingTypeVersion = (int)SchemaVersion.V7;
     }
 }

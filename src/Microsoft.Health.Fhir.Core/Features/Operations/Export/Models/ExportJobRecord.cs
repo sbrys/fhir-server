@@ -20,8 +20,11 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
         public ExportJobRecord(
             Uri requestUri,
             ExportJobType exportType,
+            string exportFormat,
             string resourceType,
+            IList<ExportJobFilter> filters,
             string hash,
+            uint rollingFileSizeInMB,
             IReadOnlyCollection<KeyValuePair<string, string>> requestorClaims = null,
             PartialDateTime since = null,
             string groupId = null,
@@ -31,15 +34,20 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
             string anonymizationConfigurationFileETag = null,
             uint maximumNumberOfResourcesPerQuery = 100,
             uint numberOfPagesPerCommit = 10,
-            string storageAccountContainerName = null)
+            string storageAccountContainerName = null,
+            int schemaVersion = 2)
         {
             EnsureArg.IsNotNull(requestUri, nameof(requestUri));
             EnsureArg.IsNotNullOrWhiteSpace(hash, nameof(hash));
+            EnsureArg.IsNotNullOrWhiteSpace(exportFormat, nameof(exportFormat));
+            EnsureArg.IsGt(schemaVersion, 0, nameof(schemaVersion));
 
             Hash = hash;
             RequestUri = requestUri;
             ExportType = exportType;
+            ExportFormat = exportFormat;
             ResourceType = resourceType;
+            Filters = filters;
             RequestorClaims = requestorClaims;
             Since = since;
             GroupId = groupId;
@@ -47,12 +55,13 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
             StorageAccountUri = storageAccountUri;
             MaximumNumberOfResourcesPerQuery = maximumNumberOfResourcesPerQuery;
             NumberOfPagesPerCommit = numberOfPagesPerCommit;
+            RollingFileSizeInMB = rollingFileSizeInMB;
 
             AnonymizationConfigurationLocation = anonymizationConfigurationLocation;
             AnonymizationConfigurationFileETag = anonymizationConfigurationFileETag;
 
             // Default values
-            SchemaVersion = 1;
+            SchemaVersion = schemaVersion;
             Id = Guid.NewGuid().ToString();
             Status = OperationStatus.Queued;
 
@@ -79,8 +88,17 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
         [JsonProperty(JobRecordProperties.ExportType)]
         public ExportJobType ExportType { get; private set; }
 
+        [JsonProperty(JobRecordProperties.ExportFormat)]
+        public string ExportFormat { get; private set; }
+
         [JsonProperty(JobRecordProperties.ResourceType)]
         public string ResourceType { get; private set; }
+
+        /// <summary>
+        /// All the filters for specific types included in the job. Set by the _typeFilter parameter.
+        /// </summary>
+        [JsonProperty(JobRecordProperties.Filters)]
+        public IList<ExportJobFilter> Filters { get; private set; }
 
         [JsonProperty(JobRecordProperties.RequestorClaims)]
         public IReadOnlyCollection<KeyValuePair<string, string>> RequestorClaims { get; private set; }
@@ -88,11 +106,14 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
         [JsonProperty(JobRecordProperties.Hash)]
         public string Hash { get; private set; }
 
-        [JsonProperty(JobRecordProperties.Output)]
-        public IDictionary<string, ExportFileInfo> Output { get; private set; } = new Dictionary<string, ExportFileInfo>();
+        [JsonProperty(JobRecordProperties.Output, ItemConverterType = typeof(ExportJobRecordOutputConverter))]
+        public IDictionary<string, List<ExportFileInfo>> Output { get; private set; } = new Dictionary<string, List<ExportFileInfo>>();
 
         [JsonProperty(JobRecordProperties.Error)]
         public IList<ExportFileInfo> Error { get; private set; } = new List<ExportFileInfo>();
+
+        [JsonProperty(JobRecordProperties.Issues)]
+        public IList<OperationOutcomeIssue> Issues { get; private set; } = new List<OperationOutcomeIssue>();
 
         [JsonProperty(JobRecordProperties.Progress)]
         public ExportJobProgress Progress { get; set; }
@@ -127,5 +148,8 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations.Export.Models
 
         [JsonProperty(JobRecordProperties.AnonymizationConfigurationFileETag)]
         public string AnonymizationConfigurationFileETag { get; private set; }
+
+        [JsonProperty(JobRecordProperties.RollingFileSizeInMB)]
+        public uint RollingFileSizeInMB { get; private set; }
     }
 }

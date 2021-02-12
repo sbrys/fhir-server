@@ -3,7 +3,9 @@
 // Licensed under the MIT License (MIT). See LICENSE in the repo root for license information.
 // -------------------------------------------------------------------------------------------------
 
+using System;
 using System.Collections.Generic;
+using System.IO;
 using System.Linq;
 using Hl7.Fhir.Model;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -15,16 +17,19 @@ using Microsoft.Health.Fhir.Core.Models;
 using Microsoft.Health.Fhir.Tests.Common;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Converters;
+using Newtonsoft.Json.Linq;
 using Newtonsoft.Json.Serialization;
 using Xunit;
+using Task = System.Threading.Tasks.Task;
 
 namespace Microsoft.Health.Fhir.Core.UnitTests.Features.Search
 {
-    public class SearchIndexerTests
+    public class SearchIndexerTests : IClassFixture<SearchParameterFixtureData>, IAsyncLifetime
     {
+        private readonly SearchParameterFixtureData _fixture;
         private ISearchIndexer _indexer;
 
-        private JsonSerializerSettings _settings = new JsonSerializerSettings
+        private readonly JsonSerializerSettings _settings = new JsonSerializerSettings
         {
             Converters = new List<JsonConverter>
             {
@@ -33,15 +38,19 @@ namespace Microsoft.Health.Fhir.Core.UnitTests.Features.Search
             ContractResolver = new CamelCasePropertyNamesContractResolver(),
         };
 
-        public SearchIndexerTests()
+        public SearchIndexerTests(SearchParameterFixtureData fixture) => _fixture = fixture;
+
+        public async Task InitializeAsync()
         {
             _indexer = new TypedElementSearchIndexer(
-                SearchParameterFixtureData.SupportedSearchDefinitionManager,
-                SearchParameterFixtureData.Manager,
+                await _fixture.GetSupportedSearchDefinitionManagerAsync(),
+                await SearchParameterFixtureData.GetFhirNodeToSearchValueTypeConverterManagerAsync(),
                 new LightweightReferenceToElementResolver(new ReferenceSearchValueParser(new FhirRequestContextAccessor()), ModelInfoProvider.Instance),
                 ModelInfoProvider.Instance,
                 NullLogger<SearchIndexer>.Instance);
         }
+
+        public Task DisposeAsync() => Task.CompletedTask;
 
         [Theory]
         [InlineData("DocumentReference-example-relatesTo-code-appends")]
@@ -52,14 +61,36 @@ namespace Microsoft.Health.Fhir.Core.UnitTests.Features.Search
             var document = Samples.GetJsonSample<DocumentReference>(resourceFile).ToResourceElement();
             var indexDocument = Samples.GetJson($"{resourceFile}.indexes");
 
-            var indexes = _indexer.Extract(document)
-                .Select(x => new { x.SearchParameter.Name, x.SearchParameter.Type, x.Value })
-                .OrderBy(x => x.Name)
+            var indices = _indexer.Extract(document)
+                .Select(x => new { x.SearchParameter.Code, x.SearchParameter.Type, x.Value })
+                .OrderBy(x => x.Code)
                 .ToArray();
 
-            var asJson = JsonConvert.SerializeObject(indexes, Formatting.Indented, _settings);
+            var extractedIndices = new List<JToken>();
+            foreach (var index in indices)
+            {
+                extractedIndices.Add(JToken.Parse(JsonConvert.SerializeObject(index, Formatting.Indented, _settings)));
+            }
 
-            Assert.Equal(indexDocument, asJson);
+            var expectedJObjects = JArray.Parse(indexDocument);
+
+            for (var i = 0; i < expectedJObjects.Count; i++)
+            {
+                bool deepEquals = JToken.DeepEquals(expectedJObjects[i], extractedIndices[i]);
+
+                if (!deepEquals)
+                {
+                    var changePath = Path.GetFullPath(Environment.CurrentDirectory + "../../../../../Microsoft.Health.Fhir.Tests.Common/TestFiles/" + ModelInfoProvider.Version)
+                                     + $"/{resourceFile}.indexes.json";
+                    if (File.Exists(changePath))
+                    {
+                        File.WriteAllText(changePath, JsonConvert.SerializeObject(indices, Formatting.Indented, _settings));
+                        Assert.True(deepEquals, "File was updated, please review changes.");
+                    }
+                }
+
+                Assert.True(deepEquals);
+            }
         }
     }
 }

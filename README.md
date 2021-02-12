@@ -27,24 +27,37 @@ This open source project is fully backed by the Microsoft Healthcare team, but w
 
 There is also a managed offering in Azure called the [Azure API for FHIR](https://azure.microsoft.com/services/azure-api-for-fhir/). This Platform as a Service (PaaS) FHIR server is backed by the open source project in this repository and it offers a turn key solution to provisioning a compliant, secure FHIR service.
 
+# Release Notes
+To see what is releasing in the FHIR Server, please refer to the [releases](https://github.com/microsoft/fhir-server/releases) section on GitHub. Starting in November 2020, we have tags on the PRs to better describe what is releasing. We have also released documentation on how to test the most recently build [here](docs/Testing-Releases.md). 
+
 # Documentation
 
-- [Open Source Deployment](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-oss-portal-quickstart): Describes how to deploy FHIR Server for Azure.
-- [PaaS Service Deployment](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-paas-portal-quickstart): Describes how to deploy Azure API for FHIR.
-- [FHIR Postman tutorial](https://docs.microsoft.com/en-us/azure/healthcare-apis/access-fhir-postman-tutorial): Describes how to access a FHIR API using Postman.
-- [Azure Active Directory Application Registrations](docs/PortalAppRegistration.md): Describes how to configure Azure Active Directory (AAD) for use with FHIR Server for Azure.
+## Getting Started
+- Quickstart guides to deploy open source using [portal](docs/QuickstartDeployPortal.md), [CLI](docs/QuickstartDeployCLI.md), and [PowerShell](docs/QuickstartDeployPowershell.md).
+- [Sql Schema Migration Guide](docs/SchemaMigrationGuide.md): Describes how to upgrade Schema for Sql Server.
+- [Register a resource application](docs/Register-Resource-Application.md): Learn how to register a resource application, which is an Azure Active Directory representation of the FHIR server API.
+- [Register a client application](docs/Register-Client-Application.md): Learn how to register a client application registration, which is an Azure Active Directory representation of an application that can be used to authenticate on behalf of a user and request access to resource applications.
+
+## Core FHIR Capabilities
+- [Azure API for FHIR documentation](https://docs.microsoft.com/azure/healthcare-apis/): Includes all Azure API for FHIR documentation which has many conceptual, how-to guides, and tutorials that can be leveraged in open-source as well.
+- [Features](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-features-supported): This document lists the main features of the FHIR Server for Azure and Azure API for FHIR.
 - [Authentication](docs/Authentication.md): Describes the authentication settings for the FHIR server and how to make use of it in development and test scenarios.
 - [Roles](docs/Roles.md): Describes how the FHIR Server for Azure role-based access control (RBAC) system works.
-- [Search](docs/Search.md): Describes how search is implemented for the FHIR Server for Azure.
+- [Search](docs/SearchArchitecture.md): Describes how search is implemented for the FHIR Server for Azure.
+
+## Additional Capabilities
+- [Bulk Export](docs/BulkExport.md): Describes using Bulk Export within the FHIR Server.
+- [Convert Data](docs/ConvertDataOperation.md): Describes how to use $convert to convert data into FHIR.
+- [FHIR Proxy](https://github.com/microsoft/health-architectures/tree/master/FHIR/FHIRProxy): Secure FHIR Gateway and Proxy to FHIR Servers.
+
+## Tutorials & How-to Guides
+- [Health Architectures](https://aka.ms/healtharchitectures): A collection of reference architectures illustrating end-to-end best practices for using the Azure API for FHIR and related technologies.
+- [FHIR Server Samples Repo](https://github.com/Microsoft/fhir-server-samples): A demo sandbox using the Azure API for FHIR.
+- [SMART on FHIR Proxy tutorial](docs/SMARTonFHIR.md): Describes how to use the proxy to enable SMART on FHIR applications with the FHIR Server.
+- [FHIR Postman tutorial](https://docs.microsoft.com/azure/healthcare-apis/access-fhir-postman-tutorial): Describes how to access a FHIR API using Postman.
 - [Debugging](docs/HowToDebug.md): Describes how to debug FHIR Server for Azure using Visual Studio.
-- [Testing with Postman](docs/PostmanTesting.md): Describes how to use Postman for testing FHIR Server for Azure.
-- [Sql Schema Migration Guide](docs/SchemaMigrationGuide.md): Describes how to upgrade Schema for Sql Server.
 
-## More Information
-
-* [Azure API for FHIR documentation](https://docs.microsoft.com/azure/healthcare-apis/)
-* [FHIR Server Samples Repo](https://github.com/Microsoft/fhir-server-samples): A demo sandbox using the Azure API for FHIR.
-* [Features](https://docs.microsoft.com/en-us/azure/healthcare-apis/fhir-features-supported): This document lists the main features of the FHIR Server for Azure and Azure API for FHIR.
+## Blog Posts
 * Blog: [FHIR Server for Azure, an open source project for modern healthcare](https://cloudblogs.microsoft.com/industry-blog/industry/health/fhir-server-for-azure-an-open-source-project-for-cloud-based-health-solutions/).
 * Blog: [Azure API for FHIR moves to general availability](https://azure.microsoft.com/en-us/blog/azure-api-for-fhir-moves-to-general-availability/).
 * Twitter: [Health_IT](https://twitter.com/Health_IT)
@@ -72,3 +85,4 @@ For more information see the [Code of Conduct FAQ](https://opensource.microsoft.
 contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
 
 FHIR&reg; is the registered trademark of HL7 and is used with the permission of HL7. 
+

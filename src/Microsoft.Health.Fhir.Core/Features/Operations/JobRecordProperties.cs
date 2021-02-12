@@ -69,8 +69,6 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations
 
         public const string FailureCount = "failureCount";
 
-        public const string Scope = "scope";
-
         public const string StorageAccountConnectionHash = "storageAccountConnectionHash";
 
         public const string StorageAccountUri = "storageAccountUri";
@@ -100,5 +98,23 @@ namespace Microsoft.Health.Fhir.Core.Features.Operations
         public const string GroupId = "groupId";
 
         public const string StorageAccountContainerName = "storageAccountContainerName";
+
+        public const string Filters = "filters";
+
+        public const string CurrentFilter = "currentFilter";
+
+        public const string FilteredSearchesComplete = "FilteredSearchesComplete";
+
+        public const string ResourceTypeSearchParameterHashMap = "resourceTypeSearchParameterHashMap";
+
+        public const string ExportFormat = "exportFormat";
+
+        public const string RollingFileSizeInMB = "rollingFileSizeInMB";
+
+        public const string Issues = "issues";
+
+        public const string TotalResourcesToReindex = "totalResourcesToReindex";
+
+        public const string ResourcesSuccessfullyReindexed = "resourcesSuccessfullyReindexed";
     }
 }

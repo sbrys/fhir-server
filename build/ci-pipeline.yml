@@ -9,9 +9,26 @@ variables:
 - template: build-variables.yml
 
 stages:
+- stage: UpdateVersion
+  displayName: 'Determine Semver'
+  dependsOn: []
+  jobs:
+  - job: Semver
+    pool:
+      vmImage: $(WindowsVmImage)
+    steps:
+    - template: ./jobs/update-semver.yml
+
 - stage: BuildUnitTests
   displayName: 'Build and run unit tests'
-  dependsOn: []
+  dependsOn:
+  - UpdateVersion
+  variables:
+    assemblySemVer: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.assemblySemVer']]
+    assemblySemFileVer: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.assemblySemFileVer']]
+    informationalVersion: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.informationalVersion']]
+    majorMinorPatch: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.majorMinorPatch']]
+    nuGetVersion: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.nuGetVersion']]
   jobs:
   - job: Windows
     pool:
@@ -29,7 +46,8 @@ stages:
 
 - stage: DockerBuild  
   displayName: 'Build images'
-  dependsOn: []
+  dependsOn:
+  - UpdateVersion
   jobs:
   - template: ./jobs/docker-build-all.yml
     parameters: 

@@ -4,6 +4,7 @@
 // -------------------------------------------------------------------------------------------------
 
 using System;
+using System.IO;
 using Hl7.Fhir.ElementModel;
 using Hl7.Fhir.Model;
 using Microsoft.Health.Fhir.Core.Extensions;
@@ -48,6 +49,8 @@ namespace Microsoft.Health.Fhir.Tests.Common
             return GetJsonSample("Organization");
         }
 
+        public static string GetProvenanceHeader() => GetJson("ProvenanceHeader");
+
         public static ResourceElement GetDefaultBatch()
         {
             var batch = GetJsonSample("Bundle-Batch").ToPoco<Bundle>();
@@ -79,6 +82,16 @@ namespace Microsoft.Health.Fhir.Tests.Common
         public static ResourceElement GetDefaultTransaction()
         {
             return GetJsonSample("Bundle-Transaction");
+        }
+
+        public static ResourceElement GetDefaultConvertDataParameter()
+        {
+            return GetJsonSample("Parameter-Convert-Data");
+        }
+
+        public static Stream GetDefaultConversionTemplates()
+        {
+            return EmbeddedResourceManager.GetContentAsSteam(EmbeddedResourceSubNamespace, "conversion_templates", "tar.gz");
         }
 
         /// <summary>

@@ -4,6 +4,7 @@
 // -------------------------------------------------------------------------------------------------
 
 using System;
+using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
 using EnsureThat;
@@ -11,8 +12,8 @@ using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using Microsoft.Health.Abstractions.Exceptions;
 using Microsoft.Health.Extensions.DependencyInjection;
+using Microsoft.Health.Fhir.Core.Extensions;
 using Microsoft.Health.Fhir.CosmosDb.Configs;
 using Microsoft.Health.Fhir.CosmosDb.Features.Storage;
 
@@ -64,7 +65,14 @@ namespace Microsoft.Health.Fhir.CosmosDb.Features.Health
 
                 return HealthCheckResult.Healthy("Successfully connected to the data store.");
             }
-            catch (RequestRateExceededException)
+            catch (CosmosException ex) when (ex.IsCmkClientError())
+            {
+                return HealthCheckResult.Unhealthy(
+                    "Connection to the data store was unsuccesful because the client's customer-managed key is not available.",
+                    exception: ex,
+                    new Dictionary<string, object>() { { "IsCustomerManagedKeyError", true } });
+            }
+            catch (Exception ex) when (ex.IsRequestRateExceeded())
             {
                 return HealthCheckResult.Healthy("Connection to the data store was successful, however, the rate limit has been exceeded.");
             }

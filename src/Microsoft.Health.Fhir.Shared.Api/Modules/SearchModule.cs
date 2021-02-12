@@ -4,9 +4,12 @@
 // -------------------------------------------------------------------------------------------------
 
 using EnsureThat;
+using MediatR;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Health.Extensions.DependencyInjection;
 using Microsoft.Health.Fhir.Api.Configs;
+using Microsoft.Health.Fhir.Api.Features.Filters;
 using Microsoft.Health.Fhir.Api.Features.Routing;
 using Microsoft.Health.Fhir.Core.Features.Compartment;
 using Microsoft.Health.Fhir.Core.Features.Definition;
@@ -17,6 +20,10 @@ using Microsoft.Health.Fhir.Core.Features.Search.Expressions.Parsers;
 using Microsoft.Health.Fhir.Core.Features.Search.Parameters;
 using Microsoft.Health.Fhir.Core.Features.Search.Registry;
 using Microsoft.Health.Fhir.Core.Features.Search.SearchValues;
+using Microsoft.Health.Fhir.Core.Messages.Create;
+using Microsoft.Health.Fhir.Core.Messages.Delete;
+using Microsoft.Health.Fhir.Core.Messages.Upsert;
+using Microsoft.Health.Fhir.Shared.Core.Features.Search.Parameters;
 
 namespace Microsoft.Health.Fhir.Api.Modules
 {
@@ -48,7 +55,7 @@ namespace Microsoft.Health.Fhir.Api.Modules
                 .Singleton()
                 .AsSelf()
                 .AsService<ISearchParameterDefinitionManager>()
-                .AsService<IStartable>();
+                .AsService<IHostedService>();
 
             services.Add<SearchableSearchParameterDefinitionManager>()
                 .Singleton()
@@ -65,11 +72,11 @@ namespace Microsoft.Health.Fhir.Api.Modules
                 .AsSelf()
                 .AsImplementedInterfaces();
 
-            services.Add<FilebasedSearchParameterRegistry>()
+            services.Add<FilebasedSearchParameterStatusDataStore>()
                 .Transient()
                 .AsSelf()
-                .AsService<ISearchParameterRegistry>()
-                .AsDelegate<FilebasedSearchParameterRegistry.Resolver>();
+                .AsService<ISearchParameterStatusDataStore>()
+                .AsDelegate<FilebasedSearchParameterStatusDataStore.Resolver>();
 
             services.Add<SearchParameterSupportResolver>()
                 .Singleton()
@@ -121,13 +128,21 @@ namespace Microsoft.Health.Fhir.Api.Modules
             services.Add<CompartmentDefinitionManager>()
                 .Singleton()
                 .AsSelf()
-                .AsService<IStartable>()
+                .AsService<IHostedService>()
                 .AsService<ICompartmentDefinitionManager>();
 
             services.Add<CompartmentIndexer>()
                 .Singleton()
                 .AsSelf()
                 .AsService<ICompartmentIndexer>();
+
+            services.AddSingleton<ISearchParameterValidator, SearchParameterValidator>();
+            services.AddSingleton<SearchParameterFilterAttribute>();
+            services.AddSingleton<ISearchParameterOperations, SearchParameterOperations>();
+
+            services.AddTransient(typeof(IPipelineBehavior<CreateResourceRequest, UpsertResourceResponse>), typeof(CreateOrUpdateSearchParameterBehavior<CreateResourceRequest, UpsertResourceResponse>));
+            services.AddTransient(typeof(IPipelineBehavior<UpsertResourceRequest, UpsertResourceResponse>), typeof(CreateOrUpdateSearchParameterBehavior<UpsertResourceRequest, UpsertResourceResponse>));
+            services.AddTransient(typeof(IPipelineBehavior<DeleteResourceRequest, DeleteResourceResponse>), typeof(DeleteSearchParameterBehavior<DeleteResourceRequest, DeleteResourceResponse>));
         }
     }
 }

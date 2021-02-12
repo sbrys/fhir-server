@@ -69,6 +69,7 @@ namespace Microsoft.Extensions.DependencyInjection
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Operations));
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Operations.Export));
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Operations.Reindex));
+            services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Operations.ConvertData));
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Audit));
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Bundle));
             services.AddSingleton(Options.Options.Create(fhirServerConfiguration.Throttling));
@@ -166,6 +167,7 @@ namespace Microsoft.Extensions.DependencyInjection
 
                     app.UseFhirRequestContextAuthentication();
 
+                    app.UseMiddleware<SearchPostReroutingMiddleware>();
                     var throttlingConfig = app.ApplicationServices.GetService<IOptions<ThrottlingConfiguration>>();
 
                     if (throttlingConfig?.Value?.Enabled == true)

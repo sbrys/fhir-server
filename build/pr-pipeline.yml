@@ -1,7 +1,6 @@
 # DESCRIPTION: 	
 # Builds, tests, and packages the solution for all PR requests.	
 
-name: pr$(system.pullRequest.pullRequestNumber)-$(Date:yyyyMMdd)$(Rev:-r)
 trigger: none
 
 variables:
@@ -9,9 +8,31 @@ variables:
 - template: build-variables.yml
 
 stages:
+- stage: UpdateVersion
+  displayName: 'Determine Semver'
+  dependsOn: []
+  jobs:
+  - job: Semver
+    pool:
+      vmImage: $(WindowsVmImage)
+    steps:
+    - template: ./jobs/update-semver.yml  
+    - powershell: |
+        $buildNumber = "$(GitVersion.semVer)" -replace "\.", "" 
+        Write-Host "##vso[build.updatebuildnumber]$buildNumber" 
+        Write-Host "Updated  build number to '$buildNumber"
+      name: SetBuildVersion
+
 - stage: BuildUnitTests
   displayName: 'Build and run unit tests'
-  dependsOn: []
+  dependsOn:
+  - UpdateVersion
+  variables:
+    assemblySemVer: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.assemblySemVer']]
+    assemblySemFileVer: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.assemblySemFileVer']]
+    informationalVersion: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.informationalVersion']]
+    majorMinorPatch: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.majorMinorPatch']]
+    nuGetVersion: $[stageDependencies.UpdateVersion.Semver.outputs['SetVariablesFromGitVersion.nuGetVersion']]
   jobs:
   - job: Windows
     pool:
@@ -29,7 +50,8 @@ stages:
 
 - stage: DockerBuild  
   displayName: 'Build images'
-  dependsOn: []
+  dependsOn:
+  - UpdateVersion
   jobs:
   - template: ./jobs/docker-build-all.yml
     parameters: 
@@ -48,7 +70,13 @@ stages:
         azurePowerShellVersion: latestVersion
         ScriptType: inlineScript
         Inline: |
-          New-AzResourceGroup -Name "$(DeploymentEnvironmentName)" -Location "$(ResourceGroupRegion)" -Force
+          try
+          {
+            Get-AzResourceGroup -Name $(ResourceGroupName) | Remove-AzResourceGroup -Verbose -Force
+          }
+          catch
+          {}
+          New-AzResourceGroup -Name "$(ResourceGroupName)" -Location "$(ResourceGroupRegion)" -Force
 
 - stage: aadTestEnvironment
   displayName: Setup AAD Test Environment
@@ -75,6 +103,7 @@ stages:
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
       dnsSuffix: $(aksDnsSuffix)
+      reindexEnabled: true
 
 - stage: deployAksR4Sql
   displayName: 'Deploy R4 Sql in AKS'
@@ -127,9 +156,10 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
+      reindexEnabled: true
 
 - stage: deployStu3Sql
   displayName: 'Deploy STU3 SQL Site'
@@ -145,7 +175,7 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
       schemaAutomaticUpdatesEnabled: true
@@ -163,9 +193,10 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
+      reindexEnabled: true
 
 - stage: deployR4Sql
   displayName: 'Deploy R4 SQL Site'
@@ -181,7 +212,7 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
       schemaAutomaticUpdatesEnabled: true
@@ -199,9 +230,10 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
+      reindexEnabled: true
 
 - stage: deployR5Sql
   displayName: 'Deploy R5 SQL Site'
@@ -217,7 +249,7 @@ stages:
       appServicePlanName: $(appServicePlanName)
       appServicePlanResourceGroup: $(appServicePlanResourceGroup)
       subscription: $(ConnectedServiceName)
-      resourceGroup: $(DeploymentEnvironmentName)
+      resourceGroup: $(ResourceGroupName)
       testEnvironmentUrl: $(TestEnvironmentUrl)
       imageTag: $(ImageTag)
       schemaAutomaticUpdatesEnabled: true

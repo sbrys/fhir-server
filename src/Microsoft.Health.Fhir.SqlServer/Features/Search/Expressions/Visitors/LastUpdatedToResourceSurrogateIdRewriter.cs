@@ -20,7 +20,7 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Search.Expressions.Visitors
 
         public override Expression VisitMissingSearchParameter(MissingSearchParameterExpression expression, object context)
         {
-            if (expression.Parameter.Name == SearchParameterNames.LastUpdated)
+            if (expression.Parameter.Code == SearchParameterNames.LastUpdated)
             {
                 return Expression.MissingSearchParameter(SqlSearchParameters.ResourceSurrogateIdParameter, expression.IsMissing);
             }
@@ -30,7 +30,7 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Search.Expressions.Visitors
 
         public override Expression VisitSearchParameter(SearchParameterExpression expression, object context)
         {
-            if (expression.Parameter.Name == SearchParameterNames.LastUpdated)
+            if (expression.Parameter.Code == SearchParameterNames.LastUpdated)
             {
                 return Expression.SearchParameter(SqlSearchParameters.ResourceSurrogateIdParameter, expression.Expression.AcceptVisitor(this, context));
             }
@@ -45,6 +45,8 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Search.Expressions.Visitors
                 throw new ArgumentOutOfRangeException(expression.FieldName.ToString());
             }
 
+            // ResourceSurrogateId has millisecond datetime precision, with lower bits added in to make the value unique.
+
             DateTime original = ((DateTimeOffset)expression.Value).UtcDateTime;
             DateTime truncated = original.TruncateToMillisecond();
 
@@ -56,28 +58,30 @@ namespace Microsoft.Health.Fhir.SqlServer.Features.Search.Expressions.Visitors
                         null,
                         ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated.AddTicks(TimeSpan.TicksPerMillisecond)));
                 case BinaryOperator.GreaterThanOrEqual:
-                    return Expression.GreaterThanOrEqual(
-                        SqlFieldName.ResourceSurrogateId,
-                        null,
-                        ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated));
+                    if (original == truncated)
+                    {
+                        return Expression.GreaterThanOrEqual(
+                            SqlFieldName.ResourceSurrogateId,
+                            null,
+                            ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated));
+                    }
+
+                    goto case BinaryOperator.GreaterThan;
                 case BinaryOperator.LessThan:
                     if (original == truncated)
                     {
-                        return Expression.LessThanOrEqual(
+                        return Expression.LessThan(
                             SqlFieldName.ResourceSurrogateId,
                             null,
-                            ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated.AddTicks(-TimeSpan.TicksPerMillisecond)));
+                            ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated));
                     }
 
-                    return Expression.LessThanOrEqual(
-                        SqlFieldName.ResourceSurrogateId,
-                        null,
-                        ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated));
+                    goto case BinaryOperator.LessThanOrEqual;
                 case BinaryOperator.LessThanOrEqual:
-                    return Expression.LessThanOrEqual(
+                    return Expression.LessThan(
                         SqlFieldName.ResourceSurrogateId,
                         null,
-                        ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated));
+                        ResourceSurrogateIdHelper.LastUpdatedToResourceSurrogateId(truncated.AddTicks(TimeSpan.TicksPerMillisecond)));
                 case BinaryOperator.NotEqual:
                 case BinaryOperator.Equal: // expecting eq to have been rewritten as a range
                 default:

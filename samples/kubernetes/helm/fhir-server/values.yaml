@@ -5,22 +5,14 @@
 replicaCount: 1
 
 image:
-  repository: healthplatformregistry.azurecr.io/r4_fhir-server
-  tag: master
+  registry: mcr.microsoft.com/healthcareapis
+  repository: r4-fhir-server
+  tag: latest
   pullPolicy: IfNotPresent
 
 imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
-
-serviceAccount:
-  # Specifies whether a service account should be created
-  create: true
-  # Annotations to add to the service account
-  annotations: {}
-  # The name of the service account to use.
-  # If not set and create is true, a name is generated using the fullname template
-  name:
 
 podIdentity:
   enabled: false
@@ -30,6 +22,9 @@ podIdentity:
 export:
   enabled: false
   blobStorageUri: https://mystorageaccount.blob.core.windows.net
+
+reindex:
+  enabled: false
 
 podSecurityContext: {}
   # fsGroup: 2000
@@ -47,7 +42,7 @@ service:
   port: 80
 
 database:
-  # options: SqlServer, SqlContainer, CosmosDb
+  # options: ExistingSqlServer, SqlServer, SqlContainer, CosmosDb
   dataStore: "SqlServer"
   resourceGroup: ""
   location: ""
@@ -64,7 +59,7 @@ database:
     edition: 5
     maxPoolSize: 100
     schema:
-      automaticUpdatesEnabled: false
+      automaticUpdatesEnabled: true
   cosmosDb:
     initialCollectionThroughput: "400"
     # databaseId: health
@@ -74,7 +69,8 @@ database:
     acceptEula: "n"
     edition: "Developer"
     image:
-      repository: mcr.microsoft.com/mssql/server
+      registry: mcr.microsoft.com
+      repository: mssql/server
       tag: 2019-latest
       pullPolicy: IfNotPresent
     replicaCount: 1
@@ -87,11 +83,21 @@ database:
       size: 8Gi
       annotations: {}
         # "helm.sh/resource-policy": keep
-    securityContext:
+    securityContext: {}
+    podSecurityContext:
       # mssql container has user mssql defined with id 10001
       runAsUser: 10001
       runAsGroup: 10001
       fsGroup: 10001
+  existingSqlServer:
+    userName: sa
+    databaseName: FHIR
+    serverName: mymssql-mssql-linux.default
+    password: fhir
+    # name of a pre-created secret to retrieve the SQL Server's password.
+    # the secret must have a key named `DATABASEPASSWORD` with the password as its value.
+    existingSecret: ""
+    port: 1433
 
 appInsights:
   secretKey: "instrumentationKey"
@@ -106,7 +112,7 @@ serviceMonitor:
   dotnetRuntimeMetrics: true
   httpMetrics: true
   systemMetrics: true
-  
+
 security:
   enabled: false
   enableAadSmartOnFhirProxy: false
@@ -120,7 +126,8 @@ ingress:
     # kubernetes.io/tls-acme: "true"
   hosts:
     - host: chart-example.local
-      paths: []
+      paths: ["/"]
+      pathType: ImplementationSpecific
   tls: []
   #  - secretName: chart-example-tls
   #    hosts:

@@ -20,6 +20,7 @@ using Microsoft.Health.Fhir.Core.Features.Context;
 using Microsoft.Health.Fhir.Core.Features.Operations;
 using Microsoft.Health.Fhir.Core.Features.Persistence;
 using Microsoft.Health.Fhir.Core.Features.Routing;
+using Microsoft.Health.Fhir.Core.Features.Search;
 using Microsoft.Health.Fhir.Core.Models;
 
 namespace Microsoft.Health.Fhir.Api.Features.Routing
@@ -141,7 +142,7 @@ namespace Microsoft.Health.Fhir.Api.Features.Routing
             return new Uri(uriString);
         }
 
-        public Uri ResolveRouteUrl(IEnumerable<Tuple<string, string>> unsupportedSearchParams = null, IReadOnlyList<(string parameterName, string reason)> unsupportedSortingParameters = null, string continuationToken = null, bool removeTotalParameter = false)
+        public Uri ResolveRouteUrl(IEnumerable<Tuple<string, string>> unsupportedSearchParams = null, IReadOnlyList<(SearchParameterInfo searchParameterInfo, SortOrder sortOrder)> resultSortOrder = null, string continuationToken = null, bool removeTotalParameter = false)
         {
             string routeName = _fhirRequestContextAccessor.FhirRequestContext.RouteName;
 
@@ -159,57 +160,33 @@ namespace Microsoft.Health.Fhir.Api.Features.Routing
             {
                 foreach (KeyValuePair<string, StringValues> searchParam in Request.Query)
                 {
-                    // Remove the parameter if:
-                    // 1. It is the _total parameter, since we only want to count for the first page of results.
                     if (removeTotalParameter && string.Equals(searchParam.Key, KnownQueryParameterNames.Total, StringComparison.OrdinalIgnoreCase))
                     {
-                        // Don't add the _total parameter to the route values.
+                        // Remove the _total parameter, since we only want to count for the first page of results.
                         continue;
                     }
 
-                    // 2. It is the _sort parameter and the parameter is not supported for sorting.
-                    if (unsupportedSortingParameters?.Count > 0 && string.Equals(searchParam.Key, KnownQueryParameterNames.Sort, StringComparison.OrdinalIgnoreCase))
+                    if (string.Equals(searchParam.Key, KnownQueryParameterNames.Sort, StringComparison.OrdinalIgnoreCase))
                     {
-                        var filteredValues = new List<string>(searchParam.Value.Count);
-
-                        foreach (string stringValue in searchParam.Value)
+                        if (resultSortOrder?.Count > 0)
                         {
-                            // parameters are separated by a comma and can be prefixed with a dash to indicate descending order
-                            string[] tokens = stringValue.Split(',');
-
-                            List<string> values = tokens.Where(sortValue =>
-                                    !unsupportedSortingParameters.Any(p =>
-                                        sortValue.EndsWith(p.parameterName, StringComparison.Ordinal) &&
-                                        (sortValue.Length == p.parameterName.Length ||
-                                            (sortValue.Length > 0 && sortValue.Length == p.parameterName.Length + 1 && sortValue[0] == '-'))))
-                                .ToList();
-
-                            if (values.Count == tokens.Length)
-                            {
-                                filteredValues.Add(stringValue);
-                            }
-                            else if (values.Count == 1)
-                            {
-                                filteredValues.Add(values[0]);
-                            }
-                            else if (values.Count > 0)
-                            {
-                                filteredValues.Add(string.Join(',', values));
-                            }
+                            // rewrite the sort order based on the sort order that was actually applied
+                            routeValues.Add(searchParam.Key, new StringValues(resultSortOrder.Select(s => $"{(s.sortOrder == SortOrder.Ascending ? string.Empty : "-")}{s.searchParameterInfo.Code}").ToArray()));
                         }
-
-                        if (filteredValues.Count > 0)
-                        {
-                            routeValues.Add(searchParam.Key, filteredValues.Count == 1 ? new StringValues(filteredValues[0]) : new StringValues(filteredValues.ToArray()));
-                        }
+                    }
+                    else if (string.Equals(searchParam.Key, KnownQueryParameterNames.Type, StringComparison.OrdinalIgnoreCase))
+                    {
+                        routeValues.Add(searchParam.Key, searchParam.Value);
                     }
                     else
                     {
-                        // 3. The parameter is not supported.
+                        // 3. The exclude unsupported parameters
                         IEnumerable<string> removedValues = searchParamsToRemove[searchParam.Key];
-
                         StringValues usedValues = removedValues.Any()
-                            ? new StringValues(searchParam.Value.Except(removedValues).ToArray())
+                            ? new StringValues(
+                                searchParam.Value.Select(x => x.SplitByOrSeparator().Except(removedValues).JoinByOrSeparator())
+                                .Where(x => !string.IsNullOrEmpty(x))
+                                .ToArray())
                             : searchParam.Value;
 
                         if (usedValues.Any())
@@ -275,6 +252,47 @@ namespace Microsoft.Health.Fhir.Api.Features.Routing
             string uriString = UrlHelper.RouteUrl(
                 routeName,
                 routeValues,
+                Request.Scheme,
+                Request.Host.Value);
+
+            return new Uri(uriString);
+        }
+
+        public Uri ResolveOperationDefinitionUrl(string operationName)
+        {
+            EnsureArg.IsNotNullOrWhiteSpace(operationName, nameof(operationName));
+
+            string routeName = null;
+            switch (operationName)
+            {
+                case OperationsConstants.Export:
+                    routeName = RouteNames.ExportOperationDefinition;
+                    break;
+                case OperationsConstants.PatientExport:
+                    routeName = RouteNames.PatientExportOperationDefinition;
+                    break;
+                case OperationsConstants.GroupExport:
+                    routeName = RouteNames.GroupExportOperationDefinition;
+                    break;
+                case OperationsConstants.AnonymizedExport:
+                    routeName = RouteNames.AnonymizedExportOperationDefinition;
+                    break;
+                case OperationsConstants.Reindex:
+                    routeName = RouteNames.ReindexOperationDefintion;
+                    break;
+                case OperationsConstants.ResourceReindex:
+                    routeName = RouteNames.ResourceReindexOperationDefinition;
+                    break;
+                case OperationsConstants.ConvertData:
+                    routeName = RouteNames.ConvertDataOperationDefinition;
+                    break;
+                default:
+                    throw new OperationNotImplementedException(string.Format(Resources.OperationNotImplemented, operationName));
+            }
+
+            string uriString = UrlHelper.RouteUrl(
+                routeName,
+                values: null,
                 Request.Scheme,
                 Request.Host.Value);
 
